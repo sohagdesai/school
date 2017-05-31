@@ -227,7 +227,9 @@ Additionally, we want to determine secondary variables by examining correlations
 ggplot(CEO, aes_string(x = "salary", y = "profits")) +
   geom_point() +
   geom_smooth(method = lm) ## Add linear regression line with by default 95% confidence region
+```
 
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=8, fig.height=3}
 cor(CEO$salary, CEO$profits)
 ```
 
@@ -241,6 +243,9 @@ ggplot(CEO, aes_string(x = "age", y = "profits")) +
   geom_point() +
   geom_smooth(method = lm) ## Add linear regression line with by default 95% confidence region
 
+```
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=8, fig.height=3}
 cor(CEO$age, CEO$profits)
 ```
 
@@ -252,7 +257,9 @@ This graph shows a weak correlation between age and profits (0.135). The linear 
 ggplot(CEO, aes_string(x = "comten", y = "profits")) +
   geom_point() +
   geom_smooth(method = lm) ## Add linear regression line with by default 95% confidence region
+```
 
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=8, fig.height=3}
 cor(CEO$comten, CEO$profits)
 ```
 Years with company shows a very weak correlation with profits (0.168). This indicates that years with company is not likely to be a confounding variable for salary. 
@@ -263,10 +270,13 @@ Years with company shows a very weak correlation with profits (0.168). This indi
 ggplot(CEO, aes_string(x = "ceoten", y = "profits")) +
   geom_point() +
   geom_smooth(method = lm) ## Add linear regression line with by default 95% confidence region
+```
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=8, fig.height=3}
 
 cor(CEO$ceoten, CEO$profits)
 ```
-CEO tenure shows almost a 0, but negative, correlation with profits. This indicates that CEO tenure is not likely to be a confounding variable for salary. However, if CEO tenure is correlated with profits, it could be a cndidate for a secondary variable.
+CEO tenure shows almost a 0, but negative, correlation with profits. This indicates that CEO tenure is not likely to be a confounding variable for salary. However, if CEO tenure is correlated with profits, it could be a candidate for a secondary variable.
 
 ## Investigate Relationship between Salary and Profits --- Assess Impact of Outliers
 
