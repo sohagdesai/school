@@ -1,0 +1,626 @@
+---
+title: 'Lab 1: Exploratory Analysis of CEO Salary Data'
+author: "Sohag, Venu, K Iwasaki"
+date: "May 25, 2017"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+---
+
+# 1. Introduction
+Objective of this analysis is to produce a report on CEO salary and answer the question whether company performance is related to salary. The data was collected and provided by the think tank firm. It has 185 rows and 8 variables as following.
+
+1. salary 1990 compensation, $1000s
+2. age in years
+3. college =1 if attended college
+4. grad =1 if attended graduate school
+5. comten years with company
+6. ceoten years as ceo with company
+7. profits 1990 profits, millions
+8. mktval market value, end 1990, mills.
+
+We approached this analysis by hypothesizing that "salary" is a primary (input) variable and "profits"" is the target (output) variable (the reasons for picking profits as the output are mentioned below). In order to this we had to perform the following steps: 
+
+* Understand all the variables
+* Partition them into input (predictor) and output (target) variables
+* Perform univariate analysis
+* Perform bivariate analysis, including assessing impact of outliers
+* Identify potential confounding variables
+* Identify potential secondary variables
+
+We then formed a conclusion about our original hypothesis. 
+
+### Definition of company performance
+Our first task is to define company performance. The performance of a corporate entity can be 
+defined as a composite assessment of how well an organization executes on its most important parameters,
+typically financial, market and shareholder performance. Key performance indicators (KPI) include 
+revenue, return on investment (ROI) (or profit), overhead and operational costs.
+
+### Variable Identification
+#### Target Variable
+With the current dataset we have been provided, there were two candidate target variables: "profits" or "mktval". 
+
+Profits are generally considered to be one of metrics to represent company performance while market value is understood as shareholder's expectation for a company and is not always tied to company performance. Thus we choose profits as a proxy for company performance in this anaysis, not market value.
+
+#### Predictor Variable
+As mentioned in the objective, the predictor variable is the salary. 
+
+# 2. Set-up and understand the data at high level
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#closeAllConnections()
+#rm(list=ls())
+
+library(car)
+library(ggplot2)
+library(dplyr)
+library(grid)
+library(gridExtra)
+library(tidyr)
+library(reshape2)
+
+setwd("/Users/sohagdesai1/Berkeley/Courses/W203/W203-Lab-1/school/w203_lab1")
+load("ceo_w203.RData")
+
+# confirm CEO data is loaded
+objects()
+```
+
+
+```{r, warning=FALSE, error=FALSE, fig.align="center", fig.width=12, fig.height=10}
+
+nrow(CEO)
+summary(CEO)
+# confirmed there is no NA value in each column
+
+# removed college and grad
+scatterplotMatrix(~ salary + age + comten + ceoten + profits + mktval,
+                  data = CEO, diagonal = "histogram")
+
+# get correlations 
+cor(CEO %>% select(-c(college, grad)))
+
+```
+
+## Observations Based on Scatter Plot Matrix
+* profits and mktval: strong correlation
+    + We can see a strongly correlated relationship between profit and market value from the graph in position (5,6) or (6,5)
+* salary and profits: mild correlation
+    + We see a weaker correlation between salary and profit from the graph in position (1,5) or (5,1)
+* salary and age: weak correlation 
+    + We see very little correlation between salary and age based on the graphs in position (1,2) or (2,1)
+
+# 3. Univariate Analysis --- Understand Each Variable
+Univariate analysis is the simplest form of analyzing data. It doesn’t deal with causes or relationships and it’s major purpose is to describe; it takes data, summarizes that data and finds patterns in the data. 
+
+Univariate analysis varies depending on whether the variable type is continuous or categorical. We will look at the statistical measures for categorical and continuous variables individually. For continuous variables, we need to understand the central tendency and spread of the variable.
+
+Our objective in performing univariate analysis was to understand the characteristics of each variable, in terms of their distribution and spread, and to determine how many outliers existed. 
+
+#### Salary
+
+* salary: skewed to the right
+    + We see a long tail towards the right of the salary histogram - this indicates the the bulk of the values are in the lower end of the range with a few outliers to the right.
+    + Salary is a continuous variable with the following central tendencies and standard deviation:
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=5, fig.height=3}
+ggplot(CEO, aes_string(x = "salary")) +
+  geom_histogram(bins=50)
+
+summary(CEO$salary)
+sd(CEO$salary)
+```
+
+#### Age
+
+* age: close to normal distribution
+    + In contrast, the age distribution is more like a normal distribution.
+    + Age is a continuous variable with the following central tendencies and standard deviation: 
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=5, fig.height=3}
+
+ggplot(CEO, aes_string(x = "age")) +
+  geom_histogram(bins=50)
+
+summary(CEO$age)
+sd(CEO$age)
+```
+
+#### College and Grad
+
+* college/grad
+    + Based on the summary above we see that college and grad are categorical variables
+    + The vast majority of employees have attended college (>160)
+    + A large number of employees have attended grad school (>100)
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=8, fig.height=3}
+
+p1 <- ggplot(CEO, aes_string(x = "college")) +
+  geom_bar(bins=50)
+
+p2 <- ggplot(CEO, aes_string(x = "grad")) +
+  geom_bar(bins=50)
+
+grid.arrange(p1, p2, ncol = 2, nrow = 1)
+
+```
+
+#### Years with Company
+
+* comten (years with company): unevenly distributed
+    + Company tenure is an uneven distribution, with two spikes indicating a large number of employees with a short tenure of less than two years and a long tenure of 35 years or so
+    + Company tenure is a continuous variable with the following central tendencies and standard deviation: 
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=5, fig.height=3}
+
+ggplot(CEO, aes_string(x = "comten")) +
+  geom_histogram(bins=50)
+
+summary(CEO$comten)
+sd(CEO$comten)
+
+```
+
+#### CEO tenure
+
+* ceoten (years as CEO with company): skewed to the right
+    + CEO tenure is skewed to the right with a long tail. The bulk of the CEOs have a tenure less than 10 years, but there are outliers with over 30 years of tenure
+    + CEO tenure is a continuous variable with the following central tendencies and standard deviation:
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=5, fig.height=3}
+
+ggplot(CEO, aes_string(x = "ceoten")) +
+  geom_histogram(bins=50)
+
+summary(CEO$ceoten)
+sd(CEO$ceoten)
+
+```
+
+#### Profits    
+
+* profits (1990 profits, millions): skewed to the right
+    + Profits is skewed to the right with a long tail. The bulk of the profits are clustered in a region less than $100M, but there are outliers with over $1B of profits including one company with well over $2B
+    + Profits is a continuous variable with the following central tendencies and spread:
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=5, fig.height=3}
+
+ggplot(CEO, aes_string(x = "profits")) +
+  geom_histogram(bins=50)
+
+summary(CEO$profits)
+sd(CEO$profits)
+
+```
+
+    
+#### Market Value    
+
+* mktval (market value, end 1990, mills.): skewed to the right
+    + Market value is skewed to the right with a long tail. The bulk of the market values are clustered in a region less than $5B, but there are outliers with over $20B of market value including one company with well over $40B
+    + Market value is a continuous variable with the following central tendencies and standard deviation: 
+
+```{r , warning=FALSE, error=FALSE, fig.align="center", fig.width=5, fig.height=3}
+
+ggplot(CEO, aes_string(x = "mktval")) +
+  geom_histogram(bins=50)
+
+summary(CEO$mktval)
+(CEO$mktval)
+```
+
+# 4. Bivariate Analysis --- Identifying Primary Variables
+Bivariate Analysis finds out the empirical relationship between two variables. We look for association and disassociation between variables at a pre-defined significance level. We can perform bivariate analysis for any combination of categorical and continuous variables. 
+
+Our objective in performing bivariate analysis is to test the hypothesis that salary was indeed the predictor for profits. In order to do this, we need to understand the relationship between other input variables (such as CEO tenure, age, education, etc.) and profits on the one hand; and other input variables (as mentioned earlier) and salary on the other hand - to determine the confounding variables. 
+
+Additionally, we want to determine secondary variables by examining correlations between other input variables and salary and other input variables and profits. If other input variables are correlated with salary but not with profits, they would be a good candidate for being a secondary variable. 
+
+#### Salary and Profits
+```{r fig.align="center", fig.width=6, fig.height=4, warning=FALSE}
+
+ggplot(CEO, aes_string(x = "salary", y = "profits")) +
+  geom_point() +
+  geom_smooth(method = lm) ## Add linear regression line with by default 95% confidence region
+
+cor(CEO$salary, CEO$profits)
+```
+
+This graph is central to the hypothesis that company performance (i.e. profits) are related to salary. We see a fairly strong correlation as is borne out by the linear relationship between salary and profits. Further, the correlation is 0.399.
+
+
+#### Age and Profits
+```{r fig.align="center", fig.width=6, fig.height=4, warning=FALSE}
+
+ggplot(CEO, aes_string(x = "age", y = "profits")) +
+  geom_point() +
+  geom_smooth(method = lm) ## Add linear regression line with by default 95% confidence region
+
+cor(CEO$age, CEO$profits)
+```
+
+This graph shows a weak correlation between age and profits (0.135). The linear regression line has a much smaller slope. However, a relationship does appear to exist, making age a candidate for confounding variable. 
+
+#### Years with Company and Profits
+```{r fig.align="center", fig.width=6, fig.height=4, warning=FALSE}
+
+ggplot(CEO, aes_string(x = "comten", y = "profits")) +
+  geom_point() +
+  geom_smooth(method = lm) ## Add linear regression line with by default 95% confidence region
+
+cor(CEO$comten, CEO$profits)
+```
+Years with company shows a very weak correlation with profits (0.168). This indicates that years with company is not likely to be a confounding variable for salary. 
+
+#### CEO tenure and Profits
+```{r fig.align="center", fig.width=6, fig.height=4, warning=FALSE}
+
+ggplot(CEO, aes_string(x = "ceoten", y = "profits")) +
+  geom_point() +
+  geom_smooth(method = lm) ## Add linear regression line with by default 95% confidence region
+
+cor(CEO$ceoten, CEO$profits)
+```
+CEO tenure shows almost a 0, but negative, correlation with profits. This indicates that CEO tenure is not likely to be a confounding variable for salary. However, if CEO tenure is correlated with profits, it could be a cndidate for a secondary variable.
+
+## Investigate Relationship between Salary and Profits --- Assess Impact of Outliers
+
+```{r fig.align="center", fig.width=10, fig.height=4, warning=FALSE}
+# plot
+p1 <- ggplot(CEO, aes(x= salary, y = profits)) +
+  geom_point() +
+  geom_smooth(method = lm) +
+  ggtitle("with") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  scale_x_continuous(limits = c(0, 5500)) +
+  scale_y_continuous(limits = c(-500, 3000))
+
+# plot without two outliers
+df <- CEO %>% filter(salary < 4000 & profits < 2000)
+p2 <- ggplot(df, aes(x= salary, y = profits)) +
+  geom_point() +
+  geom_smooth(method = lm) +
+  ggtitle("without") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  scale_x_continuous(limits = c(0, 5500)) +
+  scale_y_continuous(limits = c(-500, 3000))
+
+grid.arrange(p1, p2, ncol = 2, nrow = 1,
+             top = textGrob("with/without outliers", 
+                            gp=gpar(fontsize=18)))
+
+```
+
+```{r}
+# check outliers
+CEO %>% filter(salary > 4000)
+CEO %>% filter(profits > 2000)
+
+```
+Outliers may incorrectly show a correlation between two variables. On the other hand, they may be legitimate. In our case, we notice two outliers in the salary v/s profits graph. To assess the impact, we remove the outliers and observe the graph with and without outliers.  
+
+We see very little impact from removing the two outliers. The correlation between salary and profits is nearly unchanged. This can be explained by the fact that these two outliers counterbalance each other - one is an outlier which is a high profit for the salary, and the other is an outlier with a high salary for the profit.
+
+## Investigate relationship between salary and profits a) Confounding Variable Analysis
+So far we have selected Salary being the primary vaiable and Profits being target variable. Now we are looking for any confounding vaiables that affect this analysis.
+
+
+```{r fig.align="center", fig.width=13, fig.height=15, warning=FALSE}
+
+### Data preparation ------------------------------------------------------------------------------------
+
+# binning for education
+CEO$education[CEO$college == 0] <- "Less than college"
+CEO$education[CEO$college == 1] <- "College"
+CEO$education[CEO$grad == 1] <- "Grad"
+
+# Among 185 samples, less than college 5, college 78, grad 102
+
+CEO$education <- factor(CEO$education, levels=c("Less than college", "College", "Grad"))
+
+# binning for age
+CEO$agegroup[CEO$age <= 45] <- "Under 45"
+CEO$agegroup[CEO$age > 45 & CEO$age <= 60] <- "45 to 60"
+CEO$agegroup[CEO$age > 60] <- "Over 60"
+
+CEO$agegroup <- factor(CEO$agegroup, levels=c("Under 45", "45 to 60", "Over 60"))
+
+# age distribution
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#   21.00   51.00   57.00   55.78   61.00   86.00 
+
+#binning for CEO tenure
+CEO$ceoten_group[CEO$ceoten <= 3] <- "Less than 3"
+CEO$ceoten_group[CEO$ceoten <= 5 & CEO$ceoten > 3] <- "3 to 5"
+CEO$ceoten_group[CEO$ceoten <= 11 & CEO$ceoten > 5] <- "5 to 11"
+CEO$ceoten_group[CEO$ceoten > 11] <- "More than 11"
+
+CEO$ceoten_group <- factor(CEO$ceoten_group, levels=c("Less than 3", "3 to 5", 
+                                                      "5 to 11", "More than 11"))
+
+
+# CEO tenure distribution
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#  0.000   3.000   5.000   7.681  11.000  37.000 
+
+#binning for years with companies
+CEO$comten_group[CEO$comten <= 9] <- "Less than 9"
+CEO$comten_group[CEO$comten <= 21 & CEO$comten > 9] <- "9 to 21"
+CEO$comten_group[CEO$comten <= 33 & CEO$comten > 21] <- "21 to 33"
+CEO$comten_group[CEO$comten > 33] <- "More than 33"
+
+CEO$comten_group <- factor(CEO$comten_group, levels=c("Less than 9", "9 to 21", 
+                                                      "21 to 33", "More than 33"))
+
+#binning for mktvalue 
+CEO$mktval_group[CEO$mktval <= 0] <- "Less than 0"
+CEO$mktval_group[CEO$mktval <= 20000 & CEO$mktval > 0] <- "less than 10k"
+CEO$mktval_group[CEO$mktval > 20000] <-"greater than 20k"
+
+CEO$mktval_group <- factor(CEO$mktval_group, levels=c("Less than 0","less than 10k",
+                                                      "greater than 20k"
+                                                      ))
+
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#   2.00    9.00   21.00   21.66   33.00   58.00 
+
+### Plotting -------------------------------------------------------------------------------------------
+
+# by education
+p1 <- ggplot(CEO, aes(x= salary, y = profits, colour = education)) +
+  geom_point() +
+  scale_x_continuous(limits = c(0, 3000)) +   # this excludes outlier from the plot but not from calculation for linear regression
+  ggtitle("by education") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm,                    # Add linear regression line for each bin
+              se=FALSE) +                     # don't add shaded confidence region
+  geom_smooth(method = lm, formula = y~x,     # Add linear regression line for total data
+              se=FALSE, color = 'black', linetype = 'dashed')
+
+
+# by agegroup
+p2 <- ggplot(CEO, aes(x= salary, y = profits, colour = agegroup)) +
+  geom_point() +
+  scale_x_continuous(limits = c(0, 3000)) +   # this excludes outlier from the plot but not from calculation for linear regression
+  ggtitle("by age group") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm,                    # Add linear regression line for each bin
+              se=FALSE) +                     # don't add shaded confidence region
+  geom_smooth(method = lm, formula = y~x,     # Add linear regression line for total data
+              se=FALSE, color = 'black', linetype = 'dashed')
+
+# by ceo tenure
+p3 <- ggplot(CEO, aes(x= salary, y = profits, colour = ceoten_group)) +
+  geom_point() +
+  scale_x_continuous(limits = c(0, 3000)) +   # this excludes outlier from the plot but not from calculation for linear regression
+  ggtitle("by CEO tenure") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm,                    # Add linear regression line for each bin
+              se=FALSE) +                     # don't add shaded confidence region
+  geom_smooth(method = lm, formula = y~x,     # Add linear regression line for total data
+              se=FALSE, color = 'black', linetype = 'dashed')
+
+# by years with a company
+p4 <- ggplot(CEO, aes(x= salary, y = profits, colour = comten_group)) +
+  geom_point() +
+  scale_x_continuous(limits = c(0, 3000)) +   # this excludes outlier from the plot but not from calculation for linear regression
+  ggtitle("by years with a company") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm,                    # Add linear regression line
+              se=FALSE) +                     # don't add shaded confidence region
+  geom_smooth(method = lm, formula = y~x,     # Add linear regression line for total data
+              se=FALSE, color = 'black', linetype = 'dashed')
+
+p5 <- ggplot(CEO, aes(x= salary, y = profits, color=mktval_group)) +
+  geom_point() +
+  ggtitle("by Market Value") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm,                    # Add linear regression line
+              se=FALSE) +                     # don't add shaded confidence region
+  geom_smooth(method = lm, formula = y~x,     # Add linear regression line for total data
+              se=FALSE, color = 'black', linetype = 'dashed')
+
+grid.arrange(p1, p2, p3, p4, p5, ncol = 2, nrow = 3,
+             top = textGrob("Confounding Variables", 
+                            gp=gpar(fontsize=18)))
+
+```
+
+### Bivariate analysis of salary v/s profit by education
+* We see that the regression lines for profit vs. salary if the employee has a college or graduate degree tracks closely with the regression line for the overall profit v/s salary data set
+* For less than college education there is no correlation, however, there are only four data points corresponding to less than college education
+* This implies that education could be a confounding variable when predicting profit
+
+### Bivariate analysis of salary v/s profit by age group
+* Once again we see that the regression lines for profit vs. salary based on the age group tracks closely with the regression line for the overall profit vs. salary data set when the employee age is over 45
+* For under 45, there appears to be not much of a correlation; however there are relatively few employees below the age of 45 
+* This implies that age group could be a confounding variable when predicting profit
+* Age correlation factor with profits and salary further confirms market value being a confounding variable.
+
+```{r}
+cor(CEO$age,CEO$profits)
+cor(CEO$age,CEO$salary)
+```
+
+### Bivariate analysis of salary v/s profit by CEO tenure
+* We see that the regression lines for profit vs. salary based on CEO tenure tracks closely with the regression line for the overall profit v/s salary data set
+* This implies that CEO tenure could be a confounding variable when predicting profit
+* Ceo Tenure correlation factor with profits and salary - 
+
+```{r}
+cor(CEO$ceoten,CEO$profits)
+cor(CEO$ceoten,CEO$salary)
+```
+
+### Bivariate analysis of salary v/s profit by company tenure
+* We see that the regression lines for profit v/s salary based on company tenure tracks closely with the regression line for the overall profit v/s salary data set
+* This implies that company tenure could be a confounding variable when predicting profit
+* Company tenure value correlation factor with profits and salary further confirms it as a confounding variable.[is it? MODIFY]
+
+```{r}
+cor(CEO$comten,CEO$profits)
+cor(CEO$comten,CEO$salary)
+```
+
+### Bivariate analysis of salary v/s profit by company market value
+* We see that the regression lines for profit vs. salary based on company market value tracks  with the regression line for the overall profit vs. salary data set. 
+* This implies that market value could have an an impact on profit when considering high correlation in this dataset to Profits and also to Salary. Hence making MarketValue a potential confounding variable.
+* Market value correlation factor with profits and salary further confirms market value a confounding variable.
+
+```{r}
+cor(CEO$mktval,CEO$profits)
+cor(CEO$mktval,CEO$salary)
+```
+
+
+# 5. Bivariate analysis --- Identifying secondary variable
+
+In this section, analysis is performed to find potential secondary variables that affect the primary variables. We plotted the impact of all relevant variables in question against the primary variable: Salary
+
+```{r fig.align="center", fig.width=5, fig.height=3}
+
+col_names <- names(CEO)
+col_names <- col_names[! col_names %in% c("profits", "salary", "mktval", "college", "grad")]
+
+# for (i in col_names) {
+#   plt1 <-  ggplot(CEO, aes_string(x = i, y = "salary")) +
+#   geom_jitter() +
+#   geom_smooth(method = lm) ## Add linear regression line with by deafult 95% confidence region
+#   plot(plt1)
+# }
+
+# excdlude one outlier
+CEO_WO <- CEO %>% filter (salary < 4000)
+
+for (i in col_names) {
+  plt1 <-  ggplot(CEO_WO, aes_string(x = i, y = "salary")) +
+  geom_jitter() +
+  geom_smooth(method = lm) ## Add linear regression line with by deafult 95% confidence region
+  plot(plt1)
+}
+
+```
+
+* From the above plots, we see that impact of CEO tenure is more dominant on Salary than other variables     under consideration.
+* The rest of the variables in question were observed to be having very little or scattered impact on salary.
+* Hence further analysis is only performed on the impact of CEO Tenure variable on Salary
+
+## Exploration of secondary variables --- CEO tenure vs. salary
+* In further exploring the CEO Tenure as asecondary variable under consideration, below analysis is peformed with controlling variables such as education, age and the number of years with company.
+
+```{r fig.align="center", fig.width=13, fig.height=12, warning=FALSE}
+
+# by education
+p1 <- ggplot(CEO_WO, aes(x= ceoten, y = salary, colour = education)) +
+  geom_point() +
+  ggtitle("by eduation") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm, # Add linear regression line
+              se=FALSE) +        # don't add shaded confidence region
+  geom_smooth(method = lm, formula = y~x,     # Add linear regression line for total data
+              se=FALSE, color = 'black', linetype = 'dashed')
+
+# by CEO tenure
+p2 <- ggplot(CEO_WO, aes(x= ceoten, y = salary, colour = agegroup)) +
+  geom_point() +
+  ggtitle("by age group") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm, # Add linear regression line
+              se=FALSE) +        # don't add shaded confidence region
+  geom_smooth(method = lm, formula = y~x,     # Add linear regression line for total data
+              se=FALSE, color = 'black', linetype = 'dashed')
+# by years with a company
+p3 <- ggplot(CEO_WO, aes(x= ceoten, y = salary, colour = comten_group)) +
+  geom_point() +
+  ggtitle("by years with a compnay") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm, # Add linear regression line
+              se=FALSE)        +        # don't add shaded confidence region
+  geom_smooth(method = lm, formula = y~x,     # Add linear regression line for total data
+              se=FALSE, color = 'black', linetype = 'dashed')
+grid.arrange(p1, p2, p3, ncol = 2, nrow = 2,
+             top = textGrob("CEO tenure vs. salary", 
+                            gp=gpar(fontsize=18)))
+
+```
+
+* CEO Tenure is following salary data for education levels that are higher than College. The data on less than college education level is too small to analyze the impact. Hence only College and above education levels are considered.
+* CEO Tenure by age group and by the years with the company, the CEO tenure seems to impact salary variable.
+* Overall, CEO tenure is observed to be impacting the primary variable, Salary and hence considered as a secondary variable in our analysis.
+
+## Exploration of secondary variables --- age vs. salary --- don't show this
+
+```{r fig.align="center", fig.width=13, fig.height=12, warning=FALSE}
+
+# by education
+p1 <- ggplot(CEO_WO, aes(x= age, y = salary, colour = education)) +
+  geom_point() +
+  ggtitle("by eduation") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm, # Add linear regression line
+              se=FALSE)         # don't add shaded confidence region
+
+# by CEO tenure
+p2 <- ggplot(CEO_WO, aes(x= age, y = salary, colour = ceoten_group)) +
+  geom_point() +
+  ggtitle("by CEO tenure") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm, # Add linear regression line
+              se=FALSE)         # don't add shaded confidence region
+
+# by years with a company
+p3 <- ggplot(CEO_WO, aes(x= age, y = salary, colour = comten_group)) +
+  geom_point() +
+  ggtitle("by years with a compnay") +
+  theme(legend.position="top") +
+  theme(plot.title = element_text(hjust = 0.5, size=14)) +
+  geom_smooth(method = lm, # Add linear regression line
+              se=FALSE)         # don't add shaded confidence region
+
+grid.arrange(p1, p2, p3, ncol = 2, nrow = 2,
+             top = textGrob("Age vs. salary", 
+                            gp=gpar(fontsize=18)))
+
+```
+
+# 6. Conclusion
+
+In the bivariate analysis, we discovered that salary and profits have a correlation with correlation coefficient 0.399. This means that a CEO with \$1M higher salary works with a company with \$399M higher profits. At the same time, it is important to note we observed some data points doesn't fit with this linear relationship. For example, if you look at CEOs with salary about \$1M, you see that profits varies from negative to \$2000M.
+
+Expanding the bivariate analysis further, we observed that other variables don't have visiable corrrelation with profits. In other words, age, CEO tenure, years with a company doesn't influence on profits and vice versa. Put this into context. Although we might think that veteran CEO who is older and experienced leads company well, our analysis doesn't support that popular thought.
+
+Next step for us was to look for second variable that has correlation with the primary variable salary. We looked at three variables: employee tenure, CEO tenure, and age. All three variables have either a weak or zero correlation with salary. Among them, CEO tenure has the highest correlation coefficient 0.160 and thus we call it as second variable. However, with weath correlation coefficient, either longer or shorter CEO tenure doesn't influence on salary much.
+
+Notes on confounding variables ------------------------------------------------------
+
+We found many weak correlations between variables. This might sound useless findings. However, if you put these findings into real-world, you will find them quite useful. For example, if you know longer employee tenure for CEO doesn't correlate with larger company profits, you might suggest a company to consider younger employee for CEO candidates. You might not hesitate to fire longer tenure CEO, knowing that longer CEO tenure isn't tied with larger company profits. We recommend not only focus on correlating variable but also look for variables that don't show correlation for turning data into vlaues.
+
+![summary chart](sum.png)
+
+
+## Suggestion for further data collection and analysis
+
+1. Add new variables to the dataset: we recommend to include new variable such as an industry that a compnay belong to and year of foundation. It is known that each industry has different profit structure and show similar financial performance. For example, retail industry is famous for its low margin while tech industry is known for its high margin. Segmenting companies into groups migth enable to uncover different patterns and relationships. 
+
+2. Add more data points: 185 data points is not large enough to genelarize findings in the analysis. One more consideration here is timing of data collection. The dataset itself is quite old back in 1990. Since then, new industries such as tech industry and new breed of entities such as tech startup have emerged. Salary, age, and tenure of CEOs have changed significantly in some industries. It would be a good idea to get new data points and analyze it with fresh eye.
+
+3. More clarity on the dataset: One of the challenges in this analysis is we don't know where this dataset came from. This data might have been collected in specific industry. The data might have been selected. We don't know. Sampling method might been biased. We recommend to make sure a transparency of the dataset in order to draw as much insights as possible.
+
+
+
+
